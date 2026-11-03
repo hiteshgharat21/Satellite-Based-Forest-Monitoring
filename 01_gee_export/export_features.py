@@ -1,21 +1,11 @@
-"""
-STAGE 1: Uttarakhand ke liye satellite + weather + terrain + fire data nikalna (Google Earth Engine)
 
-Output: har saal ek CSV (Google Drive -> folder 'uk_forest') jisme har row = 1 tile x 1 month
-Columns: tile_id, year, month, ndvi, ndmi, nbr, temp_c, precip_mm, soil_moist,
-         elevation, slope, forest_frac, burned_frac (fire label ke liye)
-
-Run:  pip install earthengine-api
-      earthengine authenticate      (browser mein login, ek baar)
-      python export_features.py
-"""
 import ee
 
-GEE_PROJECT = "uk-forest-ai"   # <-- apna Google Cloud project ID daalo
+GEE_PROJECT = "uk-forest-ai"   
 START_YEAR, END_YEAR = 2019, 2025
-TILE_DEG = 0.1                        # ~11 km x 11 km tiles
-MIN_FOREST_FRAC = 0.20                # sirf wahi tiles jisme 20%+ jungle ho
-SCALE = 100                           # meters; 100 = fast, 30 = detailed but slow
+TILE_DEG = 0.1                        
+MIN_FOREST_FRAC = 0.20                
+SCALE = 100                           
 DRIVE_FOLDER = "uk_forest"
 
 ee.Initialize(project=GEE_PROJECT)
@@ -23,7 +13,7 @@ ee.Initialize(project=GEE_PROJECT)
 # ---------- 1. Uttarakhand boundary ----------
 uk = (ee.FeatureCollection("FAO/GAUL/2015/level1")
       .filter(ee.Filter.eq("ADM1_NAME", "Uttarakhand")))
-print("Uttarakhand features found:", uk.size().getInfo())   # 1 aana chahiye
+print("Uttarakhand features found:", uk.size().getInfo())   
 uk_geom = uk.geometry()
 
 # ---------- 2. Forest mask (ESA WorldCover, class 10 = Tree cover) ----------
@@ -49,7 +39,7 @@ def make_row(x):
 
 grid = ee.FeatureCollection(xs.map(make_row).flatten()).filterBounds(uk_geom)
 
-# forest fraction per tile -> low forest wale tiles hata do, tile_id banao
+
 grid = forest.reduceRegions(collection=grid, reducer=ee.Reducer.mean(), scale=SCALE)
 grid = (grid.filter(ee.Filter.gte("mean", MIN_FOREST_FRAC))
             .map(lambda f: f.set({
@@ -65,7 +55,7 @@ terrain = ee.Terrain.products(dem).select(["elevation", "slope"])
 # ---------- 5. Monthly image builder ----------
 def mask_s2(img):
     scl = img.select("SCL")
-    # hatao: shadow(3), cloud med/high(8,9), cirrus(10), snow(11)
+    
     good = scl.neq(3).And(scl.neq(8)).And(scl.neq(9)).And(scl.neq(10)).And(scl.neq(11))
     return img.updateMask(good).divide(10000).copyProperties(img, ["system:time_start"])
 
@@ -100,7 +90,7 @@ def tiles_for_month(year, month):
     res = img.reduceRegions(collection=grid, reducer=ee.Reducer.mean(), scale=SCALE, tileScale=4)
     return res.map(lambda f: f.set({"year": year, "month": month}).setGeometry(None))
 
-# ---------- 6. Export: har saal ek CSV ----------
+
 COLS = ["tile_id", "cx", "cy", "year", "month", "ndvi", "ndmi", "nbr", "temp_c",
         "precip_mm", "soil_moist", "elevation", "slope", "forest_frac", "burned_frac"]
 
@@ -112,4 +102,4 @@ for year in range(START_YEAR, END_YEAR + 1):
     task.start()
     print("Started export:", year)
 
-print("Done. Tasks ko https://code.earthengine.google.com/tasks par dekho.")
+print(" https://code.earthengine.google.com/tasks ")
